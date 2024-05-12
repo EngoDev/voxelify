@@ -1,6 +1,6 @@
 # Voxelify
 
-Convert a 2D pixel art image into GLTF 3D object
+Convert a 2D pixel art image into GLTF 3D object using voxels and face-culling
 
 [![Crates.io][crates-badge]][crates-url]
 [![MIT licensed][mit-badge]][mit-url]
