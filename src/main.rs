@@ -13,7 +13,6 @@ enum Format {
 }
 
 #[derive(Debug, Parser)]
-// #[command(version, about, long_about = None)]
 struct Args {
     #[arg(short, long)]
     input: PathBuf,
@@ -33,8 +32,6 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-    // let image_path = "iron_pickaxe.png";
-    // let output_path = "output.gltf";
 
     let img = {
         let mut img = load_image(args.input.as_path().to_str().unwrap());
@@ -59,7 +56,7 @@ fn main() {
             glb.to_writer(writer).expect("glTF binary output error");
         }
         Format::Gltf => {
-            export_to_gltf(&root, &vertices, &args.output);
+            panic!("GLTF output is not implemented yet");
         }
     }
 

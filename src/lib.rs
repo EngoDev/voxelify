@@ -120,10 +120,13 @@ pub fn image_to_vertices(image: &image::DynamicImage, height: f32) -> Vec<Vertex
 
     for y in 0..image_height {
         for x in 0..image_width {
-            let pixel = image.get_pixel(x, y).to_rgb();
-            if pixel == image::Rgb([0, 0, 0]) {
+            let pixel = image.get_pixel(x, y);
+            if pixel.0[3] == 0 {
                 continue;
             }
+            // if pixel == image::Rgb([0, 0, 0]) {
+            //     continue;
+            // }
 
             let faces = cull_faces(image, Vector2::new(x, y));
 
@@ -194,10 +197,10 @@ fn cull_faces(image: &image::DynamicImage, pos: Vector2<u32>) -> Vec<Face> {
         x if x == image_width - 1 => faces.push(Face::Right),
         _ => {
             // Check on the x-axis for adjacent pixels that are empty.
-            if is_empty_pixel(image.get_pixel(pos.x + 1, pos.y).to_rgb()) {
+            if is_empty_pixel(image.get_pixel(pos.x + 1, pos.y)) {
                 faces.push(Face::Right);
             }
-            if is_empty_pixel(image.get_pixel(pos.x - 1, pos.y).to_rgb()) {
+            if is_empty_pixel(image.get_pixel(pos.x - 1, pos.y)) {
                 faces.push(Face::Left);
             }
         }
@@ -208,10 +211,10 @@ fn cull_faces(image: &image::DynamicImage, pos: Vector2<u32>) -> Vec<Face> {
         y if y == image_height - 1 => faces.push(Face::Back),
         _ => {
             // Check on the y-axis for adjacent pixels that are empty.
-            if is_empty_pixel(image.get_pixel(pos.x, pos.y + 1).to_rgb()) {
+            if is_empty_pixel(image.get_pixel(pos.x, pos.y + 1)) {
                 faces.push(Face::Back);
             }
-            if is_empty_pixel(image.get_pixel(pos.x, pos.y - 1).to_rgb()) {
+            if is_empty_pixel(image.get_pixel(pos.x, pos.y - 1)) {
                 faces.push(Face::Forward);
             }
         }
@@ -286,22 +289,23 @@ fn create_accessors(
 }
 
 #[inline]
-fn is_empty_pixel(pixel: image::Rgb<u8>) -> bool {
-    pixel == image::Rgb([0, 0, 0])
+fn is_empty_pixel(pixel: image::Rgba<u8>) -> bool {
+    pixel.0[3] == 0
+    // pixel == image::Rgb([0, 0, 0])
 }
 
 #[rustfmt::skip]
 /// Creates the two triangles for a face of a voxel
 fn create_pixel_verticies_face(
     pos: [f32; 2],
-    color: image::Rgb<u8>,
+    color: image::Rgba<u8>,
     height: f32,
     face: &Face,
 ) -> Vec<Vertex> {
     let color = [
-        color[0] as f32 / 255.0,
-        color[1] as f32 / 255.0,
-        color[2] as f32 / 255.0,
+        color.0[0] as f32 / 255.0,
+        color.0[1] as f32 / 255.0,
+        color.0[2] as f32 / 255.0,
     ];
 
     match face {
