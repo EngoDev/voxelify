@@ -5,7 +5,7 @@ use std::io::Write;
 use std::path::Path;
 
 fn main() {
-    let image_path = "iron_sword.png";
+    let image_path = "iron_pickaxe.png";
     let output_path = "output.gltf";
 
     let img = load_image(image_path);

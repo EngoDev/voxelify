@@ -1,0 +1,11 @@
+[package]
+name = "voxelify"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.83"
+gltf = "1.4.1"
+image = "0.25.1"
+nalgebra = "0.32.5"
+thiserror = "1.0.60"

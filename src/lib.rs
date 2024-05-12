@@ -17,13 +17,16 @@ pub struct Vertex {
     color: [f32; 3],
 }
 
+/// Creates a GLB object that can be written to a file
 pub fn create_glb<'a>(
     root: &gltf::json::Root,
     vertices: &[Vertex],
 ) -> Result<gltf::binary::Glb<'a>, ExtrudeImageError> {
-    let json_string = json::serialize::to_string(&root)?; //.expect("Serialization error");
+    let json_string = json::serialize::to_string(&root)?;
+
     let mut json_offset = json_string.len();
     align_to_multiple_of_four(&mut json_offset);
+
     let glb = gltf::binary::Glb {
         header: gltf::binary::Header {
             magic: *b"glTF",
@@ -38,6 +41,7 @@ pub fn create_glb<'a>(
     Ok(glb)
 }
 
+/// Creates the root JSON object for GLTF
 pub fn create_gltf_root(vertices: &[Vertex], uri: Option<String>) -> gltf::json::Root {
     let mut root = gltf::json::Root::default();
 
@@ -108,7 +112,8 @@ pub fn create_gltf_root(vertices: &[Vertex], uri: Option<String>) -> gltf::json:
 }
 
 /// Converts an image to list of vertices that can be used to create a mesh
-/// Each pixel will be converted to a cube with height determined by the height argument
+/// Each pixel will be converted to a voxel with height determined by the height argument
+/// The faces of the voxel will be culled if they are not visible
 pub fn image_to_vertices(image: &image::DynamicImage, height: f32) -> Vec<Vertex> {
     let (image_width, image_height) = image.dimensions();
     let mut vertices = Vec::new();
@@ -130,10 +135,32 @@ pub fn image_to_vertices(image: &image::DynamicImage, height: f32) -> Vec<Vertex
                     &face,
                 ));
             }
-            // vertices.extend(create_pixel_verticies([x as f32, y as f32], pixel, height));
         }
     }
+
     vertices
+}
+
+/// Creates a padded byte vector from a generic vector
+/// Needed for creating the GLB/GLTF file
+pub fn to_padded_byte_vector<T>(vec: Vec<T>) -> Vec<u8> {
+    let byte_length = vec.len() * std::mem::size_of::<T>();
+    let byte_capacity = vec.capacity() * std::mem::size_of::<T>();
+
+    // Ensure the capacity of the vector is rounded up to the nearest multiple of four bytes.
+    let padding = (4 - byte_length % 4) % 4;
+    let padded_capacity = byte_capacity + padding;
+
+    let alloc = vec.into_boxed_slice();
+    let ptr = Box::into_raw(alloc) as *mut u8;
+
+    // Assumes the content is properly aligned as u8.
+    let mut padded_vec = unsafe { Vec::from_raw_parts(ptr, byte_length, padded_capacity) };
+
+    // Add zero-padding to ensure the length is a multiple of four bytes.
+    padded_vec.resize(padded_vec.len() + padding, 0);
+
+    padded_vec
 }
 
 /// Struct for storing accessors for the GLTF vertex buffer
@@ -156,11 +183,7 @@ enum Face {
 }
 
 /// Returns the faces that should be visible for a given pixel
-fn cull_faces(
-    image: &image::DynamicImage,
-    pos: Vector2<u32>,
-) -> Vec<Face> {
-
+fn cull_faces(image: &image::DynamicImage, pos: Vector2<u32>) -> Vec<Face> {
     let (image_width, image_height) = image.dimensions();
 
     // Initialize with Up and Down faces as they're always visible in a 2D image
@@ -196,7 +219,6 @@ fn cull_faces(
 
     faces
 }
-
 
 fn create_accessors(
     root: &mut gltf::json::Root,
@@ -263,12 +285,13 @@ fn create_accessors(
     }
 }
 
-fn is_empty_pixel(pixel: image::Rgb<u8>) 
--> bool {
+#[inline]
+fn is_empty_pixel(pixel: image::Rgb<u8>) -> bool {
     pixel == image::Rgb([0, 0, 0])
 }
 
 #[rustfmt::skip]
+/// Creates the two triangles for a face of a voxel
 fn create_pixel_verticies_face(
     pos: [f32; 2],
     color: image::Rgb<u8>,
@@ -288,16 +311,19 @@ fn create_pixel_verticies_face(
                 Vertex { position: [pos[0], pos[1], height], normal: [0.0, 0.0, 1.0], color },
                 Vertex { position: [pos[0] + 1.0, pos[1], height], normal: [0.0, 0.0, 1.0], color },
                 Vertex { position: [pos[0], pos[1] + 1.0, height], normal: [0.0, 0.0, 1.0], color },
+
                 Vertex { position: [pos[0], pos[1] + 1.0, height], normal: [0.0, 0.0, 1.0], color },
                 Vertex { position: [pos[0] + 1.0, pos[1], height], normal: [0.0, 0.0, 1.0], color },
                 Vertex { position: [pos[0] + 1.0, pos[1] + 1.0, height], normal: [0.0, 0.0, 1.0], color },
             ]
         }
+        // Bottom face (z = 0)
         Face::Down => {
             vec![
                 Vertex { position: [pos[0], pos[1], 0.0], normal: [0.0, 0.0, -1.0], color },
                 Vertex { position: [pos[0], pos[1] + 1.0, 0.0], normal: [0.0, 0.0, -1.0], color },
                 Vertex { position: [pos[0] + 1.0, pos[1], 0.0], normal: [0.0, 0.0, -1.0], color },
+
                 Vertex { position: [pos[0], pos[1] + 1.0, 0.0], normal: [0.0, 0.0, -1.0], color },
                 Vertex { position: [pos[0] + 1.0, pos[1] + 1.0, 0.0], normal: [0.0, 0.0, -1.0], color },
                 Vertex { position: [pos[0] + 1.0, pos[1], 0.0], normal: [0.0, 0.0, -1.0], color },
@@ -308,6 +334,7 @@ fn create_pixel_verticies_face(
                 Vertex { position: [pos[0], pos[1], 0.0], normal: [0.0, -1.0, 0.0], color },
                 Vertex { position: [pos[0] + 1.0, pos[1], 0.0], normal: [0.0, -1.0, 0.0], color },
                 Vertex { position: [pos[0], pos[1], height], normal: [0.0, -1.0, 0.0], color },
+
                 Vertex { position: [pos[0], pos[1], height], normal: [0.0, -1.0, 0.0], color },
                 Vertex { position: [pos[0] + 1.0, pos[1], 0.0], normal: [0.0, -1.0, 0.0], color },
                 Vertex { position: [pos[0] + 1.0, pos[1], height], normal: [0.0, -1.0, 0.0], color },
@@ -318,6 +345,7 @@ fn create_pixel_verticies_face(
                 Vertex { position: [pos[0], pos[1] + 1.0, 0.0], normal: [0.0, 1.0, 0.0], color },
                 Vertex { position: [pos[0], pos[1] + 1.0, height], normal: [0.0, 1.0, 0.0], color },
                 Vertex { position: [pos[0] + 1.0, pos[1] + 1.0, 0.0], normal: [0.0, 1.0, 0.0], color },
+
                 Vertex { position: [pos[0] + 1.0, pos[1] + 1.0, 0.0], normal: [0.0, 1.0, 0.0], color },
                 Vertex { position: [pos[0], pos[1] + 1.0, height], normal: [0.0, 1.0, 0.0], color },
                 Vertex { position: [pos[0] + 1.0, pos[1] + 1.0, height], normal: [0.0, 1.0, 0.0], color },
@@ -328,6 +356,7 @@ fn create_pixel_verticies_face(
                 Vertex { position: [pos[0], pos[1], 0.0], normal: [-1.0, 0.0, 0.0], color },
                 Vertex { position: [pos[0], pos[1], height], normal: [-1.0, 0.0, 0.0], color },
                 Vertex { position: [pos[0], pos[1] + 1.0, 0.0], normal: [-1.0, 0.0, 0.0], color },
+
                 Vertex { position: [pos[0], pos[1] + 1.0, 0.0], normal: [-1.0, 0.0, 0.0], color },
                 Vertex { position: [pos[0], pos[1], height], normal: [-1.0, 0.0, 0.0], color },
                 Vertex { position: [pos[0], pos[1] + 1.0, height], normal: [-1.0, 0.0, 0.0], color },
@@ -338,211 +367,13 @@ fn create_pixel_verticies_face(
                 Vertex { position: [pos[0] + 1.0, pos[1], 0.0], normal: [1.0, 0.0, 0.0], color },
                 Vertex { position: [pos[0] + 1.0, pos[1] + 1.0, 0.0], normal: [1.0, 0.0, 0.0], color },
                 Vertex { position: [pos[0] + 1.0, pos[1], height], normal: [1.0, 0.0, 0.0], color },
+
                 Vertex { position: [pos[0] + 1.0, pos[1] + 1.0, 0.0], normal: [1.0, 0.0, 0.0], color },
                 Vertex { position: [pos[0] + 1.0, pos[1] + 1.0, height], normal: [1.0, 0.0, 0.0], color },
                 Vertex { position: [pos[0] + 1.0, pos[1], height], normal: [1.0, 0.0, 0.0], color },
             ]
         }
     }
-}
-
-/// Takes a poistion of a pixel and it's color and converts it to a cube
-/// You can specify the height of the cube using the height arguement
-pub fn create_pixel_verticies(pos: [f32; 2], color: image::Rgb<u8>, height: f32) -> Vec<Vertex> {
-    let color = [
-        color[0] as f32 / 255.0,
-        color[1] as f32 / 255.0,
-        color[2] as f32 / 255.0,
-    ];
-
-    vec![
-        // Top face (z = 1)
-        Vertex {
-            position: [pos[0], pos[1], height],
-            normal: [0.0, 0.0, 1.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0] + 1.0, pos[1], height],
-            normal: [0.0, 0.0, 1.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0], pos[1] + 1.0, height],
-            normal: [0.0, 0.0, 1.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0], pos[1] + 1.0, height],
-            normal: [0.0, 0.0, 1.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0] + 1.0, pos[1], height],
-            normal: [0.0, 0.0, 1.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0] + 1.0, pos[1] + 1.0, height],
-            normal: [0.0, 0.0, 1.0],
-            color,
-        },
-        // Bottom face (z = 0)
-        Vertex {
-            position: [pos[0], pos[1], 0.0],
-            normal: [0.0, 0.0, -1.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0], pos[1] + 1.0, 0.0],
-            normal: [0.0, 0.0, -1.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0] + 1.0, pos[1], 0.0],
-            normal: [0.0, 0.0, -1.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0], pos[1] + 1.0, 0.0],
-            normal: [0.0, 0.0, -1.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0] + 1.0, pos[1] + 1.0, 0.0],
-            normal: [0.0, 0.0, -1.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0] + 1.0, pos[1], 0.0],
-            normal: [0.0, 0.0, -1.0],
-            color,
-        },
-        // Front face
-        Vertex {
-            position: [pos[0], pos[1], 0.0],
-            normal: [0.0, -1.0, 0.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0] + 1.0, pos[1], 0.0],
-            normal: [0.0, -1.0, 0.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0], pos[1], height],
-            normal: [0.0, -1.0, 0.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0], pos[1], height],
-            normal: [0.0, -1.0, 0.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0] + 1.0, pos[1], 0.0],
-            normal: [0.0, -1.0, 0.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0] + 1.0, pos[1], height],
-            normal: [0.0, -1.0, 0.0],
-            color,
-        },
-        // Back face
-        Vertex {
-            position: [pos[0], pos[1] + 1.0, 0.0],
-            normal: [0.0, 1.0, 0.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0], pos[1] + 1.0, height],
-            normal: [0.0, 1.0, 0.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0] + 1.0, pos[1] + 1.0, 0.0],
-            normal: [0.0, 1.0, 0.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0] + 1.0, pos[1] + 1.0, 0.0],
-            normal: [0.0, 1.0, 0.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0], pos[1] + 1.0, height],
-            normal: [0.0, 1.0, 0.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0] + 1.0, pos[1] + 1.0, height],
-            normal: [0.0, 1.0, 0.0],
-            color,
-        },
-        // Left face
-        Vertex {
-            position: [pos[0], pos[1], 0.0],
-            normal: [-1.0, 0.0, 0.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0], pos[1], height],
-            normal: [-1.0, 0.0, 0.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0], pos[1] + 1.0, 0.0],
-            normal: [-1.0, 0.0, 0.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0], pos[1] + 1.0, 0.0],
-            normal: [-1.0, 0.0, 0.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0], pos[1], height],
-            normal: [-1.0, 0.0, 0.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0], pos[1] + 1.0, height],
-            normal: [-1.0, 0.0, 0.0],
-            color,
-        },
-        // Right face
-        Vertex {
-            position: [pos[0] + 1.0, pos[1], 0.0],
-            normal: [1.0, 0.0, 0.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0] + 1.0, pos[1] + 1.0, 0.0],
-            normal: [1.0, 0.0, 0.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0] + 1.0, pos[1], height],
-            normal: [1.0, 0.0, 0.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0] + 1.0, pos[1] + 1.0, 0.0],
-            normal: [1.0, 0.0, 0.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0] + 1.0, pos[1] + 1.0, height],
-            normal: [1.0, 0.0, 0.0],
-            color,
-        },
-        Vertex {
-            position: [pos[0] + 1.0, pos[1], height],
-            normal: [1.0, 0.0, 0.0],
-            color,
-        },
-    ]
 }
 
 /// Calculate bounding coordinates of a list of vertices, used for the clipping distance of the model
@@ -557,41 +388,16 @@ fn bounding_coords(points: &[Vertex]) -> ([f32; 3], [f32; 3]) {
             max[i] = f32::max(max[i], p[i]);
         }
     }
+
     (min, max)
 }
 
-fn align_to_multiple_of_four(n: &mut usize) {
-    *n = (*n + 3) & !3;
-}
-
-pub fn to_padded_byte_vector<T>(vec: Vec<T>) -> Vec<u8> {
-    let byte_length = vec.len() * std::mem::size_of::<T>();
-    let byte_capacity = vec.capacity() * std::mem::size_of::<T>();
-    let alloc = vec.into_boxed_slice();
-    let ptr = Box::<[T]>::into_raw(alloc) as *mut u8;
-    let mut new_vec = unsafe { Vec::from_raw_parts(ptr, byte_length, byte_capacity) };
-    while new_vec.len() % 4 != 0 {
-        new_vec.push(0); // pad to multiple of four bytes
-    }
-    new_vec
+#[inline]
+fn align_to_multiple_of_four(number: &mut usize) {
+    *number = (*number + 3) & !3;
 }
 
 #[inline]
 fn calculate_buffer_length(vertices: &[Vertex]) -> usize {
     std::mem::size_of_val(vertices)
-}
-
-pub fn generate_indices(vertex_count: usize) -> Vec<u32> {
-    let indices_count = vertex_count / 4;
-    let mut indices = Vec::<u32>::with_capacity(indices_count);
-    (0..indices_count).for_each(|vert_index| {
-        let vert_index = vert_index as u32 * 4u32;
-        indices.push(vert_index);
-        indices.push(vert_index + 1);
-        indices.push(vert_index + 2);
-        indices.push(vert_index);
-        indices.push(vert_index + 2);
-        indices.push(vert_index + 3);
-    });
-    indices
 }
