@@ -5,9 +5,12 @@ use image::GenericImageView;
 use nalgebra::Vector2;
 use std::borrow::Cow;
 
-use self::error::ExtrudeImageError;
+use self::error::VoxelifyError;
 
 mod error;
+
+const ALPHA_CHANNEL_INDEX: usize = 3;
+const RGB_MAX_VALUE: f32 = 255.0;
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
@@ -21,7 +24,7 @@ pub struct Vertex {
 pub fn create_glb<'a>(
     root: &gltf::json::Root,
     vertices: &[Vertex],
-) -> Result<gltf::binary::Glb<'a>, ExtrudeImageError> {
+) -> Result<gltf::binary::Glb<'a>, VoxelifyError> {
     let json_string = json::serialize::to_string(&root)?;
 
     let mut json_offset = json_string.len();
@@ -287,8 +290,7 @@ fn create_accessors(
 
 #[inline]
 fn is_empty_pixel(pixel: image::Rgba<u8>) -> bool {
-    pixel.0[3] == 0
-    // pixel == image::Rgb([0, 0, 0])
+    pixel.0[ALPHA_CHANNEL_INDEX] == 0
 }
 
 #[rustfmt::skip]
@@ -300,9 +302,9 @@ fn create_pixel_verticies_face(
     face: &Face,
 ) -> Vec<Vertex> {
     let color = [
-        color.0[0] as f32 / 255.0,
-        color.0[1] as f32 / 255.0,
-        color.0[2] as f32 / 255.0,
+        color.0[0] as f32 / RGB_MAX_VALUE,
+        color.0[1] as f32 / RGB_MAX_VALUE,
+        color.0[2] as f32 / RGB_MAX_VALUE,
     ];
 
     match face {

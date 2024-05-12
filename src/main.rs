@@ -57,7 +57,6 @@ fn main() {
             panic!("GLTF output is not implemented yet");
         }
     }
-
 }
 
 fn load_image(file_path: &str) -> image::DynamicImage {
