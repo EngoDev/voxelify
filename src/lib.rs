@@ -11,6 +11,7 @@ mod error;
 
 const ALPHA_CHANNEL_INDEX: usize = 3;
 const RGB_MAX_VALUE: f32 = 255.0;
+const PADDING: usize = 4;
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
@@ -151,7 +152,7 @@ pub fn to_padded_byte_vector<T>(vec: Vec<T>) -> Vec<u8> {
     let byte_capacity = vec.capacity() * std::mem::size_of::<T>();
 
     // Ensure the capacity of the vector is rounded up to the nearest multiple of four bytes.
-    let padding = (4 - byte_length % 4) % 4;
+    let padding = (PADDING - byte_length % PADDING) % PADDING;
     let padded_capacity = byte_capacity + padding;
 
     let alloc = vec.into_boxed_slice();
