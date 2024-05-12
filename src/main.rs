@@ -1,28 +1,75 @@
-use image::io::Reader as ImageReader;
+use clap::{Parser, ValueEnum};
 use gltf::json;
-use voxelify::{create_glb, create_gltf_root, image_to_vertices, to_padded_byte_vector, Vertex};
+use image::io::Reader as ImageReader;
 use std::io::Write;
-use std::path::Path;
+use std::path::PathBuf;
+use voxelify::{create_glb, create_gltf_root, image_to_vertices, to_padded_byte_vector, Vertex};
+
+#[derive(Debug, Default, PartialEq, Clone, ValueEnum)]
+enum Format {
+    #[default]
+    Glb,
+    Gltf,
+}
+
+#[derive(Debug, Parser)]
+// #[command(version, about, long_about = None)]
+struct Args {
+    #[arg(short, long)]
+    input: PathBuf,
+    #[arg(short, long)]
+    format: Format,
+    #[arg(short, long)]
+    output: PathBuf,
+    #[arg(short, long)]
+    vertical_flip: bool,
+    #[arg(short, long)]
+    horizontal_flip: bool,
+    #[arg(short, long, default_value_t = 2.0)]
+    z_height: f32,
+    #[arg(short, long)]
+    uri: Option<String>,
+}
 
 fn main() {
-    let image_path = "iron_pickaxe.png";
-    let output_path = "output.gltf";
+    let args = Args::parse();
+    // let image_path = "iron_pickaxe.png";
+    // let output_path = "output.gltf";
 
-    let img = load_image(image_path);
-    let flipped = img.flipv().fliph();
-    let vertices = image_to_vertices(&flipped, 2.0);
-    let root = create_gltf_root(&vertices, None);
+    let img = {
+        let mut img = load_image(args.input.as_path().to_str().unwrap());
+
+        if args.vertical_flip {
+            img = img.flipv();
+        }
+        if args.horizontal_flip {
+            img = img.fliph();
+        }
+
+        img
+    };
+
+    let vertices = image_to_vertices(&img, args.z_height);
+    let root = create_gltf_root(&vertices, args.uri);
     let glb = create_glb(&root, &vertices).unwrap();
 
-    let writer = std::fs::File::create("test.glb").expect("I/O error");
-    glb.to_writer(writer).expect("glTF binary output error");
+    match args.format {
+        Format::Glb => {
+            let writer = std::fs::File::create(args.output).expect("I/O error");
+            glb.to_writer(writer).expect("glTF binary output error");
+        }
+        Format::Gltf => {
+            export_to_gltf(&root, &vertices, &args.output);
+        }
+    }
+
 }
 
 fn load_image(file_path: &str) -> image::DynamicImage {
     ImageReader::open(file_path).unwrap().decode().unwrap()
 }
 
-fn export_to_gltf(root: &gltf::json::Root, vertices: &[Vertex], output_dir: &Path) {
+fn export_to_gltf(root: &gltf::json::Root, vertices: &[Vertex], output_dir: &PathBuf) {
     let _ = std::fs::create_dir(output_dir);
 
     let writer = std::fs::File::create(output_dir.join("base.gltf")).expect("I/O error");

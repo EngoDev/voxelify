@@ -1,10 +1,19 @@
 [package]
 name = "voxelify"
 version = "0.1.0"
+authors = ["Shalev Goodman <shalev.goo@gmail.com>"]
+description = "Convert a 2D pixel art image into GLTF 3D object"
+documentation = "https://docs.rs/voxelify"
+repository = "https://github.com/EngoDev/voxelify"
+readme = "README.md"
+keywords = ["glTF", "3D", "model", "pixel", "voxel", "image"]
+license = "MIT OR Apache-2.0"
+include = ["**/*.rs", "Cargo.toml", "LICENSE-*"]
 edition = "2021"
 
 [dependencies]
 anyhow = "1.0.83"
+clap = { version = "4.5.4", features = ["derive"] }
 gltf = "1.4.1"
 image = "0.25.1"
 nalgebra = "0.32.5"
