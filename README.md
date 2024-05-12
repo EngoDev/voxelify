@@ -2,9 +2,9 @@
 
 Convert a 2D pixel art image into GLTF 3D object using voxels and face-culling
 
-[![Crates.io][crates-badge]][crates-url]https://crates.io/crates/voxelify
-[![MIT licensed][mit-badge]][mit-url]https://github.com/EngoDev/voxelify/blob/main/LICENSE-MIT
-[![License][apache-badge]][apache-url]https://github.com/EngoDev/voxelify/blob/main/LICENSE-APACHE
+[![Crates.io][crates-badge]][crates-url]
+[![MIT licensed][mit-badge]][mit-url]
+[![License][apache-badge]][apache-url]
 
 # Example
 
@@ -13,12 +13,9 @@ Convert a 2D pixel art image into GLTF 3D object using voxels and face-culling
 | ------------------------ | ------------------------ |
 | ![](assets/smiley.png) | ![](assets/smiley.gif) |
 
-
 # GLTF support
 
 Currently, the crate supports only GLB in GLTF 2.0 specs.
-
-
 
 Support for GLTF ascii is planned and can be tracked here: https://github.com/EngoDev/voxelify/issues/1
 
