@@ -9,8 +9,6 @@ Convert a 2D pixel art image into GLTF 3D object
 | ------------------------ | ------------------------ |
 | ![](assets/smiley.png) | ![](assets/smiley.gif) |
 
-Normals are also created
-
 # Usage
 
 ```bash

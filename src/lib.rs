@@ -1,7 +1,7 @@
 use gltf::json::validation::USize64;
 use gltf::json::{self, Index};
 use gltf::json::{buffer, validation::Checked::Valid};
-use image::{GenericImageView, Pixel};
+use image::GenericImageView;
 use nalgebra::Vector2;
 use std::borrow::Cow;
 
@@ -121,12 +121,9 @@ pub fn image_to_vertices(image: &image::DynamicImage, height: f32) -> Vec<Vertex
     for y in 0..image_height {
         for x in 0..image_width {
             let pixel = image.get_pixel(x, y);
-            if pixel.0[3] == 0 {
+            if is_empty_pixel(pixel) {
                 continue;
             }
-            // if pixel == image::Rgb([0, 0, 0]) {
-            //     continue;
-            // }
 
             let faces = cull_faces(image, Vector2::new(x, y));
 
